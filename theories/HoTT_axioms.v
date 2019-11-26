@@ -107,7 +107,7 @@ Definition IsIrr_inhab_IsContr A (H: IsIrr A) : A -> IsContr A :=
   fun x => existT _ x (H x).
   
 Definition IsHProp_to_IsIrr A : IsHProp A -> IsIrr A :=
-  fun H x y => (H x y).1. 
+  fun H x y => (H x y).1.
 
 Definition IsIrr_to_IsHProp A : IsIrr A -> IsHProp A.
   unshelve econstructor.
@@ -121,6 +121,10 @@ Definition IsHProp_inhab_isContr A {H:A -> IsContr A} : IsHProp A.
 Defined.
 
 Definition IsHPropIsContr {A} : IsHProp (IsContr A).
+  
+  apply IsIrr_to_IsHProp.
+  intros x y.
+
 Admitted. 
 
 

@@ -25,7 +25,6 @@ Section projections.
   Definition fst (p:prod A B) := prod_rect _ _ (fun _ => A) (fun x y => x) p.
 
   Definition snd (p:prod A B) := prod_rect _ _ (fun _ => B) (fun x y => y) p.
-
 End projections.
 
 Inductive eq@{i} (A:Type@{i}) (x:A) : A -> Type@{i} :=
@@ -47,15 +46,15 @@ Notation id := (fun x => x).
 
 Notation compose := (fun g f x => g (f x)).
 
-Notation "g ∘ f" := (compose g%function f%function) (at level 1): function_scope.
+Notation "g ∘ f" := (compose g%function f%function) (at level 40, left associativity): function_scope.
 (* Notation "g ∘ f" := (compose f g) (at level 1). *)
 
 Notation "{ x : A & P }" := (sigT (A:=A) (fun x => P)) : type_scope.
-Notation "x .1" := (projT1 x) (at level 3).
-Notation "x .2" := (projT2 x) (at level 3).
+Notation "x .1" := (projT1 x) (at level 2, left associativity).
+Notation "x .2" := (projT2 x) (at level 2, left associativity).
 Notation " ( x ; p ) " := (existT _ x p).
 
-Notation "f == g" := (forall x, f x = g x) (at level 3).
+Notation "f == g" := (forall x, f x = g x) (at level 41).
 
 Definition ap {A B:Type} (f:A -> B) {x y:A} (p:x = y) : f x = f y
   := match p with eq_refl => eq_refl end.

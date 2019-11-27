@@ -1,7 +1,13 @@
-From MetaCoq Require Import Template.All.
+From MetaCoq Require Import Template.All .
+From MetaCoq.Translations Require Import translation_utils.
 Require Import UR Translation TranslationUtils.
-Require Import Nat BinNat String List Lists.List.
+Require Import List Lists.List.
+Require Import Nat BinNat String.
 Import Lists.List.ListNotations.
+
+Set Universe Polymorphism.
+
+Open Scope string_scope.
 
 Instance compat_nat_N : nat ⋈ N. Admitted.
 Instance compat_Prop_Prop : Prop ⋈ Prop. Admitted.
@@ -16,15 +22,28 @@ Definition compat_le : Peano.le ≈ N.le. Admitted.
 Definition compat_succ : S ≈ N.succ. Admitted.
 
 Set Printing Universes.
-Print compat_le.
+Unset Strict Unquote Universe Mode.
 
-Run TemplateProgram (
-  define_translation "tsl_nat_N"%string
-    [ subst_type compat_nat_N ]
-    [ subst_term compat_add
-    ; subst_term compat_succ
-    ; subst_term compat_zero
-    ; subst_term compat_mul
-    ; subst_term compat_sub
-    ; subst_term compat_le
-    ]).
+Definition qnat := {| inductive_mind := "Coq.Init.Datatypes.nat"; inductive_ind := 0 |}.
+Definition qle :=  {| inductive_mind := "Coq.Init.Peano.le"; inductive_ind := 0 |}.
+
+Definition tsl_nat_N : global_env * tsl_table := (
+  [],
+  [ (IndRef qnat, mkRes <% N %> <% compat_nat_N %>)
+  ; (ConstRef "Coq.Init.Nat.add", mkRes <% N.add %> <% compat_add %>)
+  ; (ConstRef "Coq.Init.Nat.sub", mkRes <% N.sub %> <% compat_sub %>)
+  ; (ConstRef "Coq.Init.Nat.sub", mkRes <% N.sub %> <% compat_sub %>)
+  ; (ConstructRef qnat 0, mkRes <% 0%N %> <% compat_zero %>)
+  ; (ConstructRef qnat 1, mkRes <% N.succ %> <% compat_succ %>)
+  ; (IndRef qle, mkRes <% N.le %> <% compat_le %>)
+  ]
+).
+
+Infix "<=" := Peano.le.
+Close Scope type_scope.
+
+Run TemplateProgram (convert tsl_nat_N Witness (10)).
+Run TemplateProgram (convert tsl_nat_N Term (fun x : nat => x + 5)).
+Run TemplateProgram (convert tsl_nat_N Term (fun x : nat => S (S x))).
+Run TemplateProgram (convert tsl_nat_N Term (fun x : nat => 3)).
+Run TemplateProgram (convert tsl_nat_N Term (forall x : nat, 0 <= x)).

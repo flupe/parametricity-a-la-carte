@@ -4,7 +4,9 @@ Require Import UR TranslationUtils HoTT.
 Import String MonadNotation List Lists.List.
 Require Import String.
 Import Template.Universes.Level.
+Import Template.Universes.Universe.
 Import Lists.List.ListNotations.
+Require Import Datatypes.
 
 Open Scope list_scope.
 Open Scope nat_scope.
@@ -37,7 +39,7 @@ Defined.
 Definition ur_refl' := <% @ur_refl %>.
 
 (* This is wrong *)
-Definition mk_transport (A B UR t : term) := tApp <% univ_transport %> [A; B; tApp <% @FR_TypetoEquiv %> [A; B; UR]; t].
+Definition mk_transport (l : Level.t) (A B UR t : term) := tApp (set_univs <% @univalent_transport %> [l; l]) [A; B; tApp (set_univs <% @FR_TypetoEquiv %> [l]) [A; B; UR]; t].
 
 Definition mkForallUR (A A' eA B B' eB: term) := tApp <% FP_forall %> [A; A'; eA; B; B'; eB].
 
@@ -128,12 +130,30 @@ Fixpoint tsl_rec (fuel : nat) (E : tsl_table) (Σ : global_env_ext) (Γ₁ : con
           |}
   
   | tApp f args =>
-      rf    <- tsl_rec fuel E Σ Γ₁ Γ₂ f ;;
-      args' <- monad_map (tsl_rec fuel E Σ Γ₁ Γ₂) args ;;
-      
-      ret (mkRes (tApp (trad rf) (List.map trad args'))
-                 (tApp (w rf) (List.flat_map (fun (p : term × TslRes) =>
-                              [tsl_rec0 0 2 (p .1); tsl_rec0 0 1 (trad (p .2)); w (p .2)]) (zip args args'))))
+      if is_closed 0 t then
+        match infer' Σ Γ₁ t with
+        | Checked typ =>
+            match infer' Σ Γ₁ typ with 
+              | Checked (tSort s) =>
+                match Universe.level s with
+                | Some l =>
+                    typ' <- tsl_rec fuel E Σ Γ₁ Γ₂ typ ;;
+                    ret (mkRes (mk_transport l typ (trad typ') (w typ') t)
+                          (tApp (set_univs ur_refl' [l]) [ typ; trad typ'; w typ'; t ]))
+
+                | None => Error TranslationNotHandeled
+                end
+              | _ =>  Error (TranslationNotHandeled)
+              end
+        | TypeError e => Error (TypingError e)
+        end
+      else
+        rf    <- tsl_rec fuel E Σ Γ₁ Γ₂ f ;;
+        args' <- monad_map (tsl_rec fuel E Σ Γ₁ Γ₂) args ;;
+        
+        ret (mkRes (tApp (trad rf) (List.map trad args'))
+                  (tApp (w rf) (List.flat_map (fun (p : term × TslRes) =>
+                                [tsl_rec0 0 2 (p .1); tsl_rec0 0 1 (trad (p .2)); w (p .2)]) (zip args args'))))
 
 	| _ => ret (mkRes t todo)
   end
@@ -143,7 +163,7 @@ Fixpoint tsl_rec (fuel : nat) (E : tsl_table) (Σ : global_env_ext) (Γ₁ : con
 Open Scope string_scope.
 Inductive ResultType := Term | Witness.
 
-Definition convert {A} (ΣE : (global_env * tsl_table)%type) (t : ResultType) (x : A) :=
+Definition convert {A} (ΣE : Datatypes.prod global_env tsl_table) (t : ResultType) (x : A) :=
   p <- tmQuoteRec x ;;
 
   let term := p.2 in
@@ -160,7 +180,7 @@ Definition convert {A} (ΣE : (global_env * tsl_table)%type) (t : ResultType) (x
   | Success rt =>
       tmPrint "obtained translation: " ;;
       t <- tmEval all (match t with Term => trad rt | Witness => (w rt) end);;
-      (* tmPrint t ;; *)
+      tmPrint t ;;
       tmUnquote t >>= tmPrint
   end.
 

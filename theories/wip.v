@@ -1,11 +1,14 @@
+From MetaCoq Require Import Template.All.
 Require Import HoTT HoTT_axioms.
 From Coq Require Import ssreflect.
+Require Import Nat BinNat String List.
+Import ListNotations.
 
 Set Universe Polymorphism.
+Set Printing Universes.
 
-
-Class IsFun {A B} (R : A -> B -> Type) :=
-  isFun : forall x, IsContr {y:B & R x y} .
+Class IsFun@{i} {A B : Type@{i}} (R : A -> B -> Type@{i}) :=
+  isFun : (forall x, IsContr (sigT (fun y => R x y))).
 
 Hint Mode IsFun - - ! : typeclass_instances.
 
@@ -13,22 +16,23 @@ Definition sym {A B} (R : A -> B -> Type) := fun b a => R a b.
 
 Typeclasses Opaque sym.
 
-Class IsWeakEquiv {A B} (R : A -> B -> Type) :=
-  { isWFun :> IsFun R;
-    isWFunSym :> IsFun (sym R) }.
+Class IsWeakEquiv@{i} {A B : Type@{i}} (R : A -> B -> Type@{i}) :=
+  { isWFun :> IsFun R
+  ; isWFunSym :> IsFun (sym R)
+  }.
 
 Arguments isFun {_ _ _} _.
 Arguments isWFun {_ _ _} _.
 Arguments isWFunSym {_ _ _} _.
 
-Definition funR {A B R} : IsFun R -> A -> B := fun H x => (H.(isFun) x).1.1.
+Definition funR@{i} {A B : Type@{i}} {R} : IsFun R -> A -> B := fun H x => (H.(isFun) x).1.1.
 
-Definition center {A B} {R : A -> B -> Type} (F : IsFun R) :
+Definition center@{i} {A B : Type@{i}} {R : A -> B -> Type@{i}} (F : IsFun R) :
   forall x, R x (funR F x) := fun x => (F x).1.2.
 
 Definition IsFunIsHProp A B (R : A -> B -> Type) : IsHProp (IsFun R).
 Proof.
-by apply: IsTrunc_Forall => [|?]; [apply: funext|apply: IsHPropIsContr].
+  by apply: IsTrunc_Forall => [|?]; [apply: funext|apply: IsHPropIsContr].
 Defined.
 
 Definition IsFunSymIsHProp A B (R : A -> B -> Type) : IsHProp (IsFun (sym R)) :=
@@ -36,37 +40,42 @@ Definition IsFunSymIsHProp A B (R : A -> B -> Type) : IsHProp (IsFun (sym R)) :=
 
 Instance IsWeakEquiv_sym A B (R : A -> B -> Type) :
   forall (f : IsWeakEquiv R), IsWeakEquiv (sym R).
-Proof. by move=> Rwe; split; [apply: isWFunSym|apply isWFun]. Defined.
+Proof.
+  by move=> Rwe; split; [apply: isWFunSym|apply isWFun].
+Defined.
 
 Definition IsWeakEquiv_IsEquiv A B (R : A -> B -> Type) :
   forall (f : IsWeakEquiv R), IsEquiv (funR (isWFun f)).
 Proof.
-move=> [f g]; apply: (isequiv_adjointify _ (funR g)) => [x|y] /=.
-  exact: (((g (funR f x)).2 (x;(center f) x))..1).
-exact: (((f (funR g y)).2 (y;(center g) y))..1).
+  move=> [f g]; apply: (isequiv_adjointify _ (funR g)) => [x|y] /=.
+    exact: (((g (funR f x)).2 (x;(center f) x))..1).
+  exact: (((f (funR g y)).2 (y;(center g) y))..1).
 Defined.
 
 Definition IsFunRf A B (f : A -> B) : IsFun (fun a b => f a = b).
 Proof.
-move=> a; exists (f a;eq_refl) => - [b b_fa].
-by apply: path_sigma_uncurried; exists b_fa; apply: transport_paths_r.
+  move=> a; exists (f a;eq_refl) => - [b b_fa].
+  by apply: path_sigma_uncurried; exists b_fa; apply: transport_paths_r.
 Defined.
 
 Definition IsFunRfsymIsWeakEquiv A B (f : A -> B) :
   IsFun (sym (fun a b => f a = b)) -> IsWeakEquiv (fun a b => f a = b).
-Proof. by move=> ?; split=> //; apply: IsFunRf. Defined.
+Proof.
+  by move=> ?; split=> //; apply: IsFunRf.
+Defined.
 
 Definition IsFun_sym A A' (R R': A -> A' -> Type) :
   (forall a a', R a a' ≃ R' a a') -> IsFun R -> IsFun R'.
 Proof.
-move=> ReR' FR x; set R'xFx := ReR' _ _ (center FR x).
-exists (funR FR x;R'xFx) => - [y R'xy].
-apply: path_sigma_uncurried; have Fxy := ((FR x).2 (y; e_inv' (ReR' _ _) R'xy)).
-exists (Fxy..1); have /= := (Fxy..2); move: (Fxy..1) => /= {Fxy} Fxy.
-by case: _ / Fxy R'xy => /= ??; apply: Move_equiv_equiv.
+  move=> ReR' FR x; set R'xFx := ReR' _ _ (center FR x).
+  exists (funR FR x;R'xFx) => - [y R'xy].
+  apply: path_sigma_uncurried; have Fxy := ((FR x).2 (y; e_inv' (ReR' _ _) R'xy)).
+  exists (Fxy..1); have /= := (Fxy..2); move: (Fxy..1) => /= {Fxy} Fxy.
+  by case: _ / Fxy R'xy => /= ??; apply: Move_equiv_equiv.
 Defined.
 
-Class Rel A B := rel : A -> B -> Type.
+Class Rel@{i} (A B : Type@{i}) := rel : A -> B -> Type@{i}.
+Coercion rel : Rel >-> Funclass.
 
 Hint Mode Rel ! ! : typeclass_instances.
 Typeclasses Transparent Rel.
@@ -75,10 +84,12 @@ Arguments rel {_ _ _} _ _.
 
 Notation "x ≈ y" := (rel x y) (at level 20).
 
-Class FR_Type A B :=
-  { _Rel :> Rel A B;
-    _REquiv:> IsWeakEquiv rel;
+Class FR_Type@{i} (A B : Type@{i}) :=
+  { _Rel :> Rel A B
+  ; _REquiv:> IsWeakEquiv rel
   }.
+
+Coercion _Rel : FR_Type >-> Rel.
 
 Infix "⋈" := FR_Type (at level 25).
 
@@ -88,31 +99,33 @@ Typeclasses Transparent _Rel.
 
 (*! Universe !*)
 
-Instance FR_Type_def@{i j} : Rel@{j j j} Type@{i} Type@{i} :=
- FR_Type@{i i i i i}.
+Instance FR_Type_def@{i j} : Rel@{j} Type@{i} Type@{i} := FR_Type@{i}.
 
 Hint Extern 0 (?x ≈ ?y) => eassumption : typeclass_instances.
 
 Hint Extern 0 (_Rel _ _ _) => eassumption : typeclass_instances.
 
-Definition FRForall {A A'} {B : A -> Type} {B' : A' -> Type} (RA : Rel A A')
-          (RB: forall x y (H: x ≈ y), Rel (B x) (B' y)) :
-  Rel (forall x, B x) (forall y, B' y)
-  :=
-  fun f g => forall x y (H:x ≈ y), f x ≈ g y.
+Definition FRForall@{i j} {A A' : Type@{i}} 
+                        {B : A -> Type@{j}} {B' : A' -> Type@{j}} 
+                        (RA : Rel A A')
+                        (RB: forall x y (H: x ≈ y), Rel (B x) (B' y)) :
+  Rel@{j} (forall x, B x) (forall y, B' y)
+  := fun f g => forall x y (H:x ≈ y), f x ≈ g y.
 
-Definition IsFun_id A : IsFun (fun a a' : A => a = a').
-Proof. exact: IsFun_sym (fun _ _ => Equiv_id _) (IsFunRf _ _ id). Defined.
-
-Definition FR_Type_id A: FR_Type_def A A.
+Definition IsFun_id@{i} (A : Type@{i}) : IsFun (fun a a' : A => a = a').
 Proof.
-suff : IsWeakEquiv (fun a b : A => a = b) by apply: Build_FR_Type.
-split; first exact: IsFun_id.
-move=> a; exists (a;eq_refl : sym _ a a) => - [b b_a].
-by apply: path_sigma_uncurried; exists b_a^; case: b_a.
+  exact: IsFun_sym (fun _ _ => Equiv_id _) (IsFunRf _ _ id).
 Defined.
 
-Instance FP_Type : Type ⋈ Type.
+Definition FR_Type_id@{i j} (A : Type@{i}): FR_Type_def@{i j} A A.
+Proof.
+  suff : IsWeakEquiv (fun a b : A => a = b) by apply: Build_FR_Type.
+  split; first exact: IsFun_id.
+  move=> a. exists (a;eq_refl : sym _ a a) => - [b b_a].
+  by apply: path_sigma_uncurried; exists b_a^; case: b_a.
+Defined.
+
+Instance FP_Type@{i j} : FR_Type@{j} Type@{i} Type@{i}.
 Proof.
   econstructor. unfold rel. unshelve econstructor.
   intro A. unshelve econstructor.
@@ -134,10 +147,10 @@ Proof.
   cheat.
 Defined.
 
-Definition IsFun_forall (A A' : Type)
-           (B : A -> Type) (B' : A' -> Type)
-           (RA : Rel A A')
-           (RB: forall x y (H: x ≈ y), Rel (B x) (B' y))
+Definition IsFun_forall@{i j} (A A' : Type@{i})
+           (B : A -> Type@{j}) (B' : A' -> Type@{j})
+           (RA : Rel@{i} A A')
+           (RB: forall x y (H: x ≈ y), Rel@{j} (B x) (B' y))
            (eAsym : IsFun (sym RA))
            (eB : forall a a' e, IsFun (RB a a' e)):
   IsFun (FRForall RA RB).
@@ -176,10 +189,10 @@ Defined.
 Hint Extern 1 (Rel (forall x:?A, _) (forall x:?A', _)) =>
   refine (@FRForall A A' _ _ _ _); cbn in *; intros : typeclass_instances.
 
-Definition Forall_sym_sym
-           {A A'} {B : A -> Type} {B' : A' -> Type} (RA : Rel A A')
+Definition Forall_sym_sym@{i j}
+           {A A' : Type@{i}} {B : A -> Type@{j}} {B' : A' -> Type@{j}} (RA : Rel A A')
            (RB: forall x y (H: x ≈ y), Rel (B x) (B' y)) :
-  forall f g, FRForall RA RB f g ≃ sym (FRForall (sym RA) (fun x y e => sym (RB y x e))) f g.
+  forall f g, FRForall@{i j} RA RB f g ≃ sym (FRForall (sym RA) (fun x y e => sym (RB y x e))) f g.
 Proof.
   intros. unshelve econstructor; cbn. 
   compute; intros; auto. 
@@ -190,19 +203,25 @@ Proof.
   - reflexivity.
 Defined.   
 
-Definition FP_forall (A A' : Type) (eA : A ⋈ A')
-           (B : A -> Type) (B' : A' -> Type) (eB : B ≈ B') :
+(* FRForall@{i} {A A' : Type@{i}} 
+                        {B : A -> Type@{i}} {B' : A' -> Type@{i}} 
+                        (RA : Rel A A')
+                        (RB: forall x y (H: x ≈ y), Rel (B x) (B' y)) : *)
+Definition FP_forall@{i j} (A A' : Type@{i}) (eA : A ⋈ A')
+                           (B : A -> Type@{j}) (B' : A' -> Type@{j}) (eB : FRForall@{i i} _ _ B B') :
   (forall x : A, B x) ⋈ (forall x : A', B' x).
 Proof.
+Admitted.
+(* Admitted.
   unshelve econstructor.
   unshelve eapply FRForall.
   intros. eapply eB. typeclasses eauto.
   split.
-  apply IsFun_forall; typeclasses eauto.
-  eapply IsFun_sym. eapply Forall_sym_sym.
+  apply IsFun_forall.  typeclasses eauto.
+  intros a a' e. eapply IsFun_sym. eapply Forall_sym_sym.
   apply IsFun_forall. destruct eA. destruct _REquiv0. assumption.
   intros. destruct (eB a' a e). destruct _REquiv0. assumption.
-Defined.
+Defined. *)
 
 Inductive list (A : Type) : Type :=
     nil : list A | cons : A -> list A -> list A.
@@ -213,7 +232,7 @@ Arguments cons {_} _ _.
 Notation "[ ]" := nil (format "[ ]").
 Notation "[ x ]" := (cons x nil).
 Notation "[ x ; y ; .. ; z ]" := (cons x (cons y .. (cons z nil) ..)).
-Notation "[ x ; .. ; y ]" := (cons x .. (cons y nil) ..) (compat "8.6").
+Notation "[ x ; .. ; y ]" := (cons x .. (cons y nil) ..).
 
 Infix "::" := cons (at level 60, right associativity).
 
@@ -221,7 +240,6 @@ Inductive listR {A B} (R : A -> B -> Type) : list A -> list B -> Type :=
   listR_nil : listR R nil nil
 | listR_cons : forall {a b l l'},
     (R a b) -> (listR R l l') -> listR R (a::l) (b::l').
-
 
 Definition transport_listR_cons A B (RA : A -> B -> Type)
            (a :A) b b' (l: list A ) (lb lb':list B) (h:b=b') (e:lb=lb')
@@ -267,8 +285,8 @@ Proof.
     apply ap2; try reflexivity; assumption.
 Defined.
 
-Definition FP_list (A A' : Type) (eA : A ⋈ A'):
-  list A ⋈ list A'.
+Definition FP_list@{i} (A A' : Type@{i}) (eA : A ⋈ A'):
+  FR_Type@{i} (list A) (list A').
 Proof.
   unshelve econstructor.
   exact (listR (_Rel eA)).
@@ -278,3 +296,85 @@ Proof.
   apply IsFun_list. destruct eA. destruct _REquiv0.
   exact isWFunSym0.
 Defined.
+
+(* 
+Parameter A B : Type.
+Parameter eAB : A ⋈ B.
+
+Inductive ZA :=
+  | posA : A -> ZA
+  | negA : A -> ZA.
+
+Inductive ZB :=
+  | posB : B -> ZB
+  | negB : B -> ZB.
+
+Inductive ZR (R : A -> B -> Type) : ZA -> ZB -> Type :=
+  | posR : forall {x y}, R x y -> ZR R (posA x) (posB y)
+  | negR : forall {x y}, R x y -> ZR R (negA x) (negB y).
+
+Definition transport_ZR_posR A B (RA : A -> B -> Type)
+  (a :A) b b' (h:b=b') (e: RA a b):
+transport_eq
+ (fun Y => ZR RA (posR a) Y) (ap posB h) (posR)  =
+  posR RA (transport_eq (fun X => RA _ X) h _)
+          (transport_eq (fun X : list B => ZR RA _ X) e _).
+destruct h, e. reflexivity.
+Defined.
+
+
+Definition IsFun_Z (R : A -> B -> Type) (F : IsFun R) : IsFun (ZR R).
+Proof.
+  intro za. unshelve econstructor.
+- unshelve eexists.
+  + exact ((ZA_rec (fun _ => ZB) (fun a => posB (funR F a)) (fun a => negB (funR F a))) za).
+  + induction za.
+    * eapply posR, center.
+    * eapply negR, center.
+- intros [za' zr].
+  induction zr; cbn.
+  apply path_sigma_uncurried. unshelve eexists. cbn in *.
+  eapply ap. exact (((F x).2 (y ;r))..1).
+
+  shelve.
+  apply path_sigma_uncurried. unshelve eexists. cbn in *.
+  eapply ap. exact (((F x).2 (y ;r))..1).
+  
+
+  
+  (* * exact (listR_nil _).
+  * eapply listR_cons; try assumption. apply center.
+- intros [l' ell'].
+induction ell'; cbn.
++ reflexivity.
++ apply path_sigma_uncurried. unshelve eexists; cbn in *.
+* apply ap2. exact (((FA a).2 (b ;r))..1). exact (IHell'..1).
+* rewrite transport_listR_cons. apply ap2.
+exact (((FA a).2 (b ;r))..2).
+exact (IHell'..2). *)
+Admitted.
+
+Definition ZR_sym_sym (R : A -> B -> Type) :
+forall za zb, ZR R za zb ≃ sym (ZR (sym R)) za zb.
+Proof.
+intros l l'. unshelve econstructor.
+induction 1; constructor; assumption.
+unshelve eapply isequiv_adjointify.
+- induction 1; constructor; assumption.
+- intro e; induction e; cbn. reflexivity.
+apply ap2; try reflexivity; assumption.
+- intro e; induction e; cbn. reflexivity.
+apply ap2; try reflexivity; assumption.
+Defined.
+
+Definition FP_list (A A' : Type) (eA : A ⋈ A'):
+list A ⋈ list A'.
+Proof.
+unshelve econstructor.
+exact (listR (_Rel eA)).
+split.
+apply IsFun_list; typeclasses eauto.
+eapply IsFun_sym. eapply listR_sym_sym.
+apply IsFun_list. destruct eA. destruct _REquiv0.
+exact isWFunSym0.
+Defined. *)

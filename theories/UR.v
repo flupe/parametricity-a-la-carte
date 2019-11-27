@@ -239,7 +239,8 @@ Admitted.
   intros. destruct (eB a' a e). destruct _REquiv0. assumption.
 Defined. *)
 
-Section URList.
+
+Module URList.
 
   Inductive list (A : Type) : Type :=
     | nil : list A

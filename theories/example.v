@@ -43,7 +43,13 @@ Infix "<=" := Peano.le.
 Close Scope type_scope.
 
 Run TemplateProgram (convert tsl_nat_N Witness (10)).
-Run TemplateProgram (convert tsl_nat_N Term (fun x : nat => x + 5)).
-Run TemplateProgram (convert tsl_nat_N Term (fun x : nat => S (S x))).
-Run TemplateProgram (convert tsl_nat_N Term (fun x : nat => 3)).
-Run TemplateProgram (convert tsl_nat_N Term (forall x : nat, 0 <= x)).
+Run TemplateProgram (convert tsl_nat_N Witness (fun x : nat => x + 5)).
+Run TemplateProgram (convert tsl_nat_N Witness (fun x : nat => S (S x))).
+Run TemplateProgram (convert tsl_nat_N Witness (fun x : nat => 3)).
+Run TemplateProgram (convert tsl_nat_N Witness (nat -> nat)%type).
+
+Unset Strict Universe Declaration.
+Definition s := FP_forall nat N compat_nat_N (fun x : nat => Peano.le 0 x) (fun x : N => N.le 0%N x)
+                            (fun (x1 : nat) (x2 : N) (xr : x1 ≈ x2) => compat_le 0 0%N compat_zero x1 x2 xr).
+
+(* *) Run TemplateProgram (convert tsl_nat_N Witness (forall x : nat, 0 <= x)). *)

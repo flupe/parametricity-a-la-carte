@@ -17,12 +17,10 @@ Local Existing Instance default_fuel.
 Open Scope list_scope.
 
 (* Given e : A ⋈ B, a : A, b : B, returns a ≈ b with the given UR *)
-Definition rel_of (e a b: term) :=
-  tApp (tProj ({| inductive_mind := "ParametricityALaCarte.theories.UR.Rel"
-                ; inductive_ind  := 0 |}, 2, 0)%core
-         (tProj ({| inductive_mind := "ParametricityALaCarte.theories.UR.FR_Type"
-                  ; inductive_ind  := 0 |}, 2, 1)%core 
-           (e))) [a; b].
+Definition rel_of (l : Level.t) (A B e a b: term) :=
+  tApp (set_univs <% @rel %> [l]) [ A ; B
+                                  ; tApp (set_univs <% @_Rel %> [l]) [A; B; e]
+                                  ; a ; b ].
 
 (* Given a term e :  A ⋈ B, returns the projection onto _REquiv *)
 Definition proj_equiv (e : term) :=
@@ -41,7 +39,8 @@ Definition ur_refl' := <% @ur_refl %>.
 (* This is wrong *)
 Definition mk_transport (l : Level.t) (A B UR t : term) := tApp (set_univs <% @univalent_transport %> [l; l]) [A; B; tApp (set_univs <% @FR_TypetoEquiv %> [l]) [A; B; UR]; t].
 
-Definition mkForallUR (A A' eA B B' eB: term) := tApp <% FP_forall %> [A; A'; eA; B; B'; eB].
+Definition mkForallUR (l1 l2 : Level.t) (A A' eA B B' eB: term) :=
+  tApp (set_univs <% FP_forall %> [l1; l2; l2]) [A; A'; eA; B; B'; eB].
 
 
 Fixpoint tsl_rec0 (n : nat) (o : nat) (t : term) {struct t} : term :=
@@ -75,11 +74,19 @@ Fixpoint tsl_rec (fuel : nat) (E : tsl_table) (Σ : global_env_ext) (Γ₁ : con
     let B' := tLambda n A B in
     rB <- tsl_rec fuel E Σ Γ₁ Γ₂ B' ;;
 
-    (* this is undesirable, but for now we cannot do better *)
-    ret {| trad := tProd n (trad rA) (tApp (lift 1 0 (trad rB)) [tRel 0])
-              (* {A A'} {HA : UR A A'} {P : A -> Type} {Q : A' -> Type} (eB : forall x y (H:x ≈ y), P x ⋈ Q y) *)
-        ;  w := mkForallUR A (trad rA) (w rA) B' (trad rB) (mkForallUR A (trad rA) (w rA) B' (trad rB) (w rB))
-        |}
+    match infer' Σ Γ₁ A, infer' Σ (vass n A :: Γ₁) B with
+    | Checked (tSort s1), Checked (tSort s2) =>
+      match Universe.level s1, Universe.level s2 with
+      | Some l1, Some l2 =>
+          (* this is undesirable, but for now we cannot do better *)
+          ret {| trad := tProd n (trad rA) (tApp (lift 1 0 (trad rB)) [tRel 0])
+                    (* {A A'} {HA : UR A A'} {P : A -> Type} {Q : A' -> Type} (eB : forall x y (H:x ≈ y), P x ⋈ Q y) *)
+              ;  w := mkForallUR l1 l2 A (trad rA) (w rA) B' (trad rB) (w rB)
+              |}
+      | _, _ => Error TranslationNotHandeled
+      end
+    | _, _ => Error TranslationNotHandeled
+    end
     
   | tInd ind u =>
       match lookup_table E (IndRef ind) with
@@ -117,17 +124,25 @@ Fixpoint tsl_rec (fuel : nat) (E : tsl_table) (Σ : global_env_ext) (Γ₁ : con
   | tRel x => ret (mkRes t (tRel (x * 3)))
 
   | tLambda n A B =>
-      rA <- tsl_rec fuel E Σ Γ₁ Γ₂ A ;;
-      rB <- tsl_rec fuel E Σ (vass n A :: Γ₁) (vass n (trad rA) :: Γ₂) B ;;
-      ret {| trad := tLambda n (trad rA) (trad rB)
-          ;  w := tLambda (suffix n "₁") A (
-                    tLambda (suffix n "₂") (trad rA) (
-                      tLambda (suffix n "ᵣ") (rel_of (w rA) (tRel 1) (tRel 0)) (
-                        w rB
-                      )
-                    )
-                  )
-          |}
+      match infer' Σ Γ₁ A with
+      | Checked (tSort s) =>
+        match Universe.level s with
+        | Some l =>
+          rA <- tsl_rec fuel E Σ Γ₁ Γ₂ A ;;
+          rB <- tsl_rec fuel E Σ (vass n A :: Γ₁) (vass n (trad rA) :: Γ₂) B ;;
+          ret {| trad := tLambda n (trad rA) (trad rB)
+              ;  w := tLambda (suffix n "₁") A (
+                        tLambda (suffix n "₂") (trad rA) (
+                          tLambda (suffix n "ᵣ") (rel_of l A (trad rA) (w rA) (tRel 1) (tRel 0)) (
+                            w rB
+                          )
+                        )
+                      ) 
+              |}
+        | None => Error (TranslationNotHandeled)
+        end
+      | _ => Error TranslationNotHandeled
+      end
   
   | tApp f args =>
       if is_closed 0 t then

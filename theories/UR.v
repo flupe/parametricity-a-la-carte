@@ -121,12 +121,12 @@ Instance FR_Type_def@{i j} : Rel@{j} Type@{i} Type@{i} := FR_Type@{i}.
 Hint Extern 0 (?x ≈ ?y) => eassumption : typeclass_instances.
 Hint Extern 0 (_Rel _ _ _) => eassumption : typeclass_instances.
 
-Definition FRForall@{i j} {A A' : Type@{i}} 
+Definition FRForall@{i j k} {A A' : Type@{i}} 
                         {B : A -> Type@{j}} {B' : A' -> Type@{j}} 
                         (RA : Rel A A')
-                        (RB: forall x y (H: x ≈ y), Rel (B x) (B' y)) :
-  Rel@{j} (forall x, B x) (forall y, B' y)
-  := fun f g => forall x y (H:x ≈ y), f x ≈ g y.
+                        (RB: forall x y (H: RA x y), Rel (B x) (B' y)) :
+  Rel@{k} (forall x, B x) (forall y, B' y)
+  := fun f g => forall x y (H : RA x y), RB x y H (f x) (g y).
 
 Definition IsFun_id@{i} (A : Type@{i}) : IsFun (fun a a' : A => a = a').
 Proof.
@@ -163,10 +163,10 @@ Proof.
   cheat.
 Defined.
 
-Definition IsFun_forall@{i j} (A A' : Type@{i})
-           (B : A -> Type@{j}) (B' : A' -> Type@{j})
-           (RA : Rel@{i} A A')
-           (RB: forall x y (H: x ≈ y), Rel@{j} (B x) (B' y))
+Definition IsFun_forall (A A' : Type)
+           (B : A -> Type) (B' : A' -> Type)
+           (RA : Rel A A')
+           (RB: forall x y (H: x ≈ y), Rel (B x) (B' y))
            (eAsym : IsFun (sym RA))
            (eB : forall a a' e, IsFun (RB a a' e)):
   IsFun (FRForall RA RB).
@@ -205,10 +205,10 @@ Defined.
 Hint Extern 1 (Rel (forall x:?A, _) (forall x:?A', _)) =>
   refine (@FRForall A A' _ _ _ _); cbn in *; intros : typeclass_instances.
 
-Definition Forall_sym_sym@{i j}
-           {A A' : Type@{i}} {B : A -> Type@{j}} {B' : A' -> Type@{j}} (RA : Rel A A')
+Definition Forall_sym_sym
+           {A A' : Type} {B : A -> Type} {B' : A' -> Type} (RA : Rel A A')
            (RB: forall x y (H: x ≈ y), Rel (B x) (B' y)) :
-  forall f g, FRForall@{i j} RA RB f g ≃ sym (FRForall (sym RA) (fun x y e => sym (RB y x e))) f g.
+  forall f g, FRForall RA RB f g ≃ sym (FRForall (sym RA) (fun x y e => sym (RB y x e))) f g.
 Proof.
   intros. unshelve econstructor; cbn. 
   compute; intros; auto. 
@@ -219,16 +219,24 @@ Proof.
   - reflexivity.
 Defined.   
 
-(* FRForall@{i} {A A' : Type@{i}} 
-                        {B : A -> Type@{i}} {B' : A' -> Type@{i}} 
+(* FRForall@{i j} {A A' : Type@{i}} 
+                        {B : A -> Type@{j}} {B' : A' -> Type@{j}} 
                         (RA : Rel A A')
                         (RB: forall x y (H: x ≈ y), Rel (B x) (B' y)) : *)
-Definition FP_forall@{i j} (A A' : Type@{i}) (eA : A ⋈ A')
-                           (B : A -> Type@{j}) (B' : A' -> Type@{j}) (eB : FRForall@{i i} _ _ B B') :
-  (forall x : A, B x) ⋈ (forall x : A', B' x).
+Definition FP_forall@{i j k} (A A' : Type@{i}) (eA : A ⋈ A')
+                           (B : A -> Type@{j}) (B' : A' -> Type@{j}) (RB: forall x y (H: eA x y), FR_Type@{j} (B x) (B' y)) :
+  FR_Type@{k} (forall x : A, B x) (forall x : A', B' x).
 Proof.
+  unshelve econstructor.
+  unshelve econstructor.
+  apply IsFun_forall. typeclasses eauto.
+  intros a a' e. typeclasses eauto.
+  eapply IsFun_sym. eapply Forall_sym_sym.
+  apply IsFun_forall. destruct eA. destruct _REquiv0. assumption.
+  intros. destruct (RB a' a e). destruct _REquiv0. assumption.
 Admitted.
-(* Admitted.
+
+(*
   unshelve econstructor.
   unshelve eapply FRForall.
   intros. eapply eB. typeclasses eauto.
@@ -239,6 +247,7 @@ Admitted.
   intros. destruct (eB a' a e). destruct _REquiv0. assumption.
 Defined. *)
 
+Print FP_forall.
 
 Module URList.
 

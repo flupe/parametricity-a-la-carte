@@ -219,6 +219,9 @@ Proof.
   - reflexivity.
 Defined.   
 
+Instance compat_Prop_Prop : Prop ⋈ Prop. Admitted.
+Instance UR_Prop : Rel Prop Prop := compat_Prop_Prop.
+
 (* FRForall@{i j} {A A' : Type@{i}} 
                         {B : A -> Type@{j}} {B' : A' -> Type@{j}} 
                         (RA : Rel A A')
@@ -234,6 +237,12 @@ Proof.
   eapply IsFun_sym. eapply Forall_sym_sym.
   apply IsFun_forall. destruct eA. destruct _REquiv0. assumption.
   intros. destruct (RB a' a e). destruct _REquiv0. assumption.
+Admitted.
+
+Definition FP_forall_Prop@{i j k} (A A' : Type@{i}) (eA : A ⋈ A')
+                           (B : A -> Prop) (B' : A' -> Prop) (RB: forall x y (H: eA x y), UR_Prop@{k} (B x) (B' y)) :
+  FR_Type@{k} (forall x : A, B x) (forall x : A', B' x).
+Proof.
 Admitted.
 
 (*

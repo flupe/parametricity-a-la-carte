@@ -39,8 +39,11 @@ Definition ur_refl' := <% @ur_refl %>.
 (* This is wrong *)
 Definition mk_transport (l : Level.t) (A B UR t : term) := tApp (set_univs <% @univalent_transport %> [l; l]) [A; B; tApp (set_univs <% @FR_TypetoEquiv %> [l]) [A; B; UR]; t].
 
-Definition mkForallUR (l1 l2 : Level.t) (A A' eA B B' eB: term) :=
-  tApp (set_univs <% FP_forall %> [l1; l2; l2]) [A; A'; eA; B; B'; eB].
+Definition mkForallUR (l1 l2 l3 : Level.t) (A A' eA B B' eB: term) :=
+  match l2 with
+  | lProp =>  tApp (set_univs <% FP_forall_Prop %> [l1; l2; l3]) [A; A'; eA; B; B'; eB]
+  | _     =>  tApp (set_univs <% FP_forall %> [l1; l2; l3]) [A; A'; eA; B; B'; eB]
+  end.
 
 
 Fixpoint tsl_rec0 (n : nat) (o : nat) (t : term) {struct t} : term :=
@@ -81,7 +84,7 @@ Fixpoint tsl_rec (fuel : nat) (E : tsl_table) (Σ : global_env_ext) (Γ₁ : con
           (* this is undesirable, but for now we cannot do better *)
           ret {| trad := tProd n (trad rA) (tApp (lift 1 0 (trad rB)) [tRel 0])
                     (* {A A'} {HA : UR A A'} {P : A -> Type} {Q : A' -> Type} (eB : forall x y (H:x ≈ y), P x ⋈ Q y) *)
-              ;  w := mkForallUR l1 l2 A (trad rA) (w rA) B' (trad rB) (w rB)
+              ;  w := mkForallUR l1 l2 l2 A (trad rA) (w rA) B' (trad rB) (w rB)
               |}
       | _, _ => Error TranslationNotHandeled
       end
@@ -195,7 +198,7 @@ Definition convert {A} (ΣE : Datatypes.prod global_env tsl_table) (t : ResultTy
   | Success rt =>
       tmPrint "obtained translation: " ;;
       t <- tmEval all (match t with Term => trad rt | Witness => (w rt) end);;
-      tmPrint t ;;
+      (* tmPrint t ;; *)
       tmUnquote t >>= tmPrint
   end.
 

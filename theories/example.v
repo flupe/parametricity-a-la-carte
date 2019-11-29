@@ -11,8 +11,6 @@ Open Scope string_scope.
 
 Instance compat_nat_N : nat ⋈ N. Admitted.
 Instance compat_Prop_Prop : Prop ⋈ Prop. Admitted.
-Instance UR_nat_N : Rel nat N := compat_nat_N.
-Instance UR_Prop : Rel Prop Prop := compat_Prop_Prop.
 
 Definition compat_zero : 0 ≈ 0%N. Admitted.
 Definition compat_add : add ≈ N.add. Admitted.
@@ -49,7 +47,8 @@ Run TemplateProgram (convert tsl_nat_N Witness (fun x : nat => 3)).
 Run TemplateProgram (convert tsl_nat_N Witness (nat -> nat)%type).
 
 Unset Strict Universe Declaration.
-Definition s := FP_forall nat N compat_nat_N (fun x : nat => Peano.le 0 x) (fun x : N => N.le 0%N x)
+
+Definition s := FP_forall_Prop nat N compat_nat_N (fun x : nat => Peano.le 0 x) (fun x : N => N.le 0%N x)
                             (fun (x1 : nat) (x2 : N) (xr : x1 ≈ x2) => compat_le 0 0%N compat_zero x1 x2 xr).
 
-(* *) Run TemplateProgram (convert tsl_nat_N Witness (forall x : nat, 0 <= x)). *)
+Run TemplateProgram (convert tsl_nat_N  Witness (forall x : nat, 0 <= x)).

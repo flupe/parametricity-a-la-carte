@@ -24,7 +24,7 @@ Definition rel_of (l : Level.t) (A B e a b: term) :=
 
 (* Given a term e :  A ⋈ B, returns the projection onto _REquiv *)
 Definition proj_equiv (e : term) :=
-  tProj ({| inductive_mind := "UnivalentParametricity.theories.UR.FR_Type"
+  tProj ({| inductive_mind := "UnivalentParametricity.theories.UR.UR"
           ; inductive_ind  := 0 |}, 2, 0)%core e.
 
 Definition univ_transport := <% @univalent_transport %>.
@@ -36,15 +36,14 @@ Defined.
 
 Definition ur_refl' := <% @ur_refl %>.
 
-(* This is wrong *)
-Definition mk_transport (l : Level.t) (A B UR t : term) := tApp (set_univs <% @univalent_transport %> [l; l]) [A; B; tApp (set_univs <% @FR_TypetoEquiv %> [l]) [A; B; UR]; t].
+Definition mk_transport (l : Level.t) (A B UR t : term) :=
+  tApp (set_univs <% @univalent_transport %> [l; l]) [A; B; tApp (set_univs <% @URToEquiv %> [l]) [A; B; UR]; t].
 
-Definition mkForallUR (l1 l2 l3 : Level.t) (A A' eA B B' eB: term) :=
-  match l2 with
-  | lProp =>  tApp (set_univs <% FP_forall_Prop %> [l1; l2; l3]) [A; A'; eA; B; B'; eB]
-  | _     =>  tApp (set_univs <% FP_forall %> [l1; l2; l3]) [A; A'; eA; B; B'; eB]
-  end.
-
+Definition mkForallUR (l1 l2 : Level.t) (A A' eA B B' eB: term) :=tApp (set_univs <% UR_Forall %> [l1; l2; fresh_level; fresh_level]) [A; A'; eA; B; B'; eB].
+  (* match l2 with
+  | lProp =>  tApp (set_univs <% UR_Forall_Prop %> [l1; l2; fresh_level]) [A; A'; eA; B; B'; eB]
+  | _     =>  tApp (set_univs <% UR_Forall %> [l1; l2; fresh_level; fresh_level]) [A; A'; eA; B; B'; eB]
+  end. *)
 
 Fixpoint tsl_rec0 (n : nat) (o : nat) (t : term) {struct t} : term :=
   match t with
@@ -77,24 +76,32 @@ Fixpoint tsl_rec (fuel : nat) (E : tsl_table) (Σ : global_env_ext) (Γ₁ : con
     let B' := tLambda n A B in
     rB <- tsl_rec fuel E Σ Γ₁ Γ₂ B' ;;
 
-    match infer' Σ Γ₁ A, infer' Σ (vass n A :: Γ₁) B with
-    | Checked (tSort s1), Checked (tSort s2) =>
-      match Universe.level s1, Universe.level s2 with
-      | Some l1, Some l2 =>
+    match infer' Σ Γ₁ A with
+    | Checked (tSort s1) =>
+      match Universe.level s1 with
+      | Some l1 =>
           (* this is undesirable, but for now we cannot do better *)
           ret {| trad := tProd n (trad rA) (tApp (lift 1 0 (trad rB)) [tRel 0])
                     (* {A A'} {HA : UR A A'} {P : A -> Type} {Q : A' -> Type} (eB : forall x y (H:x ≈ y), P x ⋈ Q y) *)
-              ;  w := mkForallUR l1 l2 l2 A (trad rA) (w rA) B' (trad rB) (w rB)
+              ;  w := mkForallUR l1 fresh_level A (trad rA) (w rA) B' (trad rB) (w rB)
               |}
-      | _, _ => Error TranslationNotHandeled
+      | _ => Error TranslationNotHandeled
       end
-    | _, _ => Error TranslationNotHandeled
+    | _ => Error TranslationNotHandeled
     end
     
   | tInd ind u =>
       match lookup_table E (IndRef ind) with
       | Some tsl => ret tsl
-      | None => ret (mkRes t todo)
+      | None =>
+          match infer' Σ Γ₁ t with
+          | Checked (tSort s) =>
+              match Universe.level s with
+              | Some l => ret (mkRes t (tApp (set_univs  <% UR_id %> [l]) [t]))
+              | _ => Error TranslationNotHandeled
+              end
+          | _ => Error TranslationNotHandeled
+          end
       (* | None     => ret (mkRes t (tApp <% UR_id %> [t])) *)
       end
 
@@ -142,7 +149,7 @@ Fixpoint tsl_rec (fuel : nat) (E : tsl_table) (Σ : global_env_ext) (Γ₁ : con
                         )
                       ) 
               |}
-        | None => Error (TranslationNotHandeled)
+        | None => Error TranslationNotHandeled
         end
       | _ => Error TranslationNotHandeled
       end
@@ -181,12 +188,11 @@ Fixpoint tsl_rec (fuel : nat) (E : tsl_table) (Σ : global_env_ext) (Γ₁ : con
 Open Scope string_scope.
 Inductive ResultType := Term | Witness.
 
-Definition convert {A} (ΣE : Datatypes.prod global_env tsl_table) (t : ResultType) (x : A) :=
+Definition convert {A} (E : tsl_table) (t : ResultType) (x : A) :=
   p <- tmQuoteRec x ;;
 
   let term := p.2 in
-  let env := empty_ext (app (fst ΣE) p.1) in
-  let E := snd ΣE in
+  let env := empty_ext p.1 in
 
   result <- tmEval lazy (tsl_rec fuel E env [] [] term) ;;
   

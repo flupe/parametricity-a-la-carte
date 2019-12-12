@@ -16,7 +16,9 @@ Inductive prod (A B : Type) : Type :=  pair : A -> B -> prod A B.
 Arguments pair {_ _} _ _.
 
 Notation "x * y" := (prod x y) : type_scope.
-Notation "( x , y , .. , z )" := (pair .. (pair x y) .. z): type_scope.
+Notation "( x , y , .. , z )" := (pair .. (pair x y) .. z): hott_scope.
+
+Open Scope hott_scope.
 
 Section projections.
   Context {A : Type} {B : Type}.

@@ -1,4 +1,4 @@
-From MetaCoq Require Import Template.All Checker.All Template.Universes.
+Require Import MetaCoq.Template.All.
 From MetaCoq.Translations Require Import translation_utils.
 Import Template.Universes.Level.
 Import String MonadNotation List Lists.List.
@@ -18,6 +18,7 @@ Record TslRes := mkRes
   }.
 
 Definition tsl_table := list (Datatypes.prod global_reference TslRes).
+Definition tsl_context := (tsl_table * global_env_ext)%type.
 
 Fixpoint lookup_table (E : tsl_table) (gr : global_reference) : option TslRes :=
 	match E with
@@ -67,7 +68,7 @@ Definition liftA2 {M} `{Monad M} {A B C} (f : A -> B -> C) (ma : M A) (mb : M B)
 Infix "$>"  := fmap (at level 10, left associativity).
 Infix "<*>" := (liftA2 id) (at level 10, left associativity).
 
-Fixpoint sequence {M A} `{Monad M} (t : Datatypes.list (M A)) : M (Datatypes.list A) :=
+Fixpoint sequence {M} {A : Type}  `{Monad M} (t : Datatypes.list (M A)) : M (Datatypes.list A) :=
   match t with
   | List.nil => ret List.nil
   | List.cons x t => List.cons $> x <*> (sequence t)
